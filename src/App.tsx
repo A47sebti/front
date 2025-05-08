@@ -1,14 +1,14 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-//import Navbar from './components/layout/Navbar';
-//import Home from './pages/Home';
+import Navbar from './components/layout/Navbar';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
-//import Dashboard from './pages/Dashboard';
-//import InterventionList from './pages/interventions/InterventionList';
-//import InterventionReport from './pages/interventions/InterventionReport';
-//import AlertDashboard from './pages/alerts/AlertDashboard';
-//import { AuthProvider } from './context/AuthContext';
-import 'src/App.css';
+import Dashboard from './pages/dashboard/Dashboard';
+import InterventionList from './pages/interventions/InterventionList';
+import InterventionForm from './pages/interventions/InterventionForm';
+import Reports from './pages/reports/Reports';
+import SiteForm from './pages/sites/SiteForm';
+import { AuthProvider } from './context/AuthContext';
+import './App.css';
 
 function App() {
   return (
@@ -18,15 +18,21 @@ function App() {
           <Navbar />
           <main className="container">
             <Routes>
+              <Route path="/" element={<Dashboard />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               
               {/* Routes des interventions */}
               <Route path="/interventions" element={<InterventionList />} />
-              <Route path="/interventions/:id/report" element={<InterventionReport />} />
+              <Route path="/interventions/new" element={<InterventionForm />} />
+              <Route path="/interventions/:id/edit" element={<InterventionForm />} />
               
-              {/* Routes des alertes */}
-              <Route path="/alerts" element={<AlertDashboard />} />
+              {/* Routes des rapports */}
+              <Route path="/reports" element={<Reports />} />
+
+              {/* Routes des sites */}
+              <Route path="/sites/new" element={<SiteForm />} />
+              <Route path="/sites/:id/edit" element={<SiteForm />} />
             </Routes>
           </main>
         </div>
