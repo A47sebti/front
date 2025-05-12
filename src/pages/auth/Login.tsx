@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -10,14 +10,30 @@ import {
   Link,
 } from '@mui/material';
 import { authService } from '../../services/authService';
+import { useAuth } from '../../context/AuthContext';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   });
   const [error, setError] = useState('');
+  const [canRegister, setCanRegister] = useState(false);
+
+  useEffect(() => {
+    // Vérifier si l'utilisateur peut créer d'autres utilisateurs
+    const checkRegisterPermission = async () => {
+      try {
+        const hasPermission = await authService.canRegisterUsers();
+        setCanRegister(hasPermission);
+      } catch (err) {
+        setCanRegister(false);
+      }
+    };
+    checkRegisterPermission();
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -30,8 +46,8 @@ const Login: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await authService.login(formData);
-      navigate('/dashboard');
+      await login(formData.email, formData.password);
+      // La redirection sera gérée par le contexte d'authentification
     } catch (err) {
       setError('Email ou mot de passe incorrect');
     }
@@ -98,7 +114,7 @@ const Login: React.FC = () => {
             Se connecter
           </Button>
 
-          {authService.canRegisterUsers() && (
+          {canRegister && (
             <Box sx={{ mt: 2, textAlign: 'center' }}>
               <Link
                 component="button"

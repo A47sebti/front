@@ -18,15 +18,21 @@ import {
   ListItemText,
   IconButton,
   Divider,
+  Stepper,
+  Step,
+  StepLabel,
 } from '@mui/material';
 import { Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
 import { siteService, Site, Equipment } from '../../services/siteService';
 import { authService } from '../../services/authService';
+import { useAuth } from '../../context/AuthContext';
 
 const SiteForm: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
   const [error, setError] = useState<string>('');
+  const [success, setSuccess] = useState<string>('');
   const [formData, setFormData] = useState<Omit<Site, '_id' | 'createdAt' | 'updatedAt'>>({
     name: '',
     location: {
@@ -38,10 +44,13 @@ const SiteForm: React.FC = () => {
       }
     },
     type: 'urban',
-    status: 'active',
+    status: 'inactive',
+    validationStatus: user?.role === 'ADMIN' ? 'approved' : 'pending',
     equipment: [],
     lastMaintenance: new Date().toISOString(),
-    nextMaintenance: new Date().toISOString()
+    nextMaintenance: new Date().toISOString(),
+    createdBy: user?.id || '',
+    siege: user?.siege || '',
   });
 
   const [newEquipment, setNewEquipment] = useState<Omit<Equipment, '_id'>>({
@@ -53,23 +62,22 @@ const SiteForm: React.FC = () => {
     specifications: {}
   });
 
-  const isAdmin = authService.hasRole('ADMIN');
-  const isGestionnaire = authService.hasRole('GESTIONNAIRE');
+  const isAdmin = user?.role === 'ADMIN';
+  const isGestionnaire = user?.role === 'GESTIONNAIRE';
+
+  // États du workflow de validation
+  const validationSteps = ['Création', 'Validation Administrative', 'Site Actif'];
+  const currentStep = formData.validationStatus === 'approved' ? 2 : 
+                     formData.validationStatus === 'pending' ? 1 : 0;
 
   useEffect(() => {
     if (id) {
-      // Charger les données du site si on est en mode édition
       const loadSite = async () => {
         try {
           const site = await siteService.getSiteById(id);
           setFormData({
-            name: site.name,
-            location: site.location,
-            type: site.type,
-            status: site.status,
-            equipment: site.equipment,
-            lastMaintenance: site.lastMaintenance,
-            nextMaintenance: site.nextMaintenance
+            ...site,
+            equipment: site.equipment || [],
           });
         } catch (err) {
           setError('Erreur lors du chargement du site');
@@ -136,10 +144,23 @@ const SiteForm: React.FC = () => {
     try {
       if (id) {
         await siteService.updateSite(id, formData);
+        setSuccess('Site mis à jour avec succès');
       } else {
-        await siteService.createSite(formData);
+        const newSite = await siteService.createSite({
+          ...formData,
+          validationStatus: isAdmin ? 'approved' : 'pending',
+        });
+        
+        if (isAdmin) {
+          setSuccess('Site créé avec succès');
+        } else {
+          setSuccess('Site proposé avec succès. En attente de validation administrative.');
+        }
       }
-      navigate('/sites');
+      
+      setTimeout(() => {
+        navigate('/sites');
+      }, 2000);
     } catch (err) {
       setError('Erreur lors de l\'enregistrement du site');
     }
@@ -152,9 +173,24 @@ const SiteForm: React.FC = () => {
           {id ? 'Modifier le Site' : 'Nouveau Site Mobile'}
         </Typography>
 
+        {/* Stepper de validation */}
+        <Stepper activeStep={currentStep} sx={{ mb: 4 }}>
+          {validationSteps.map((label) => (
+            <Step key={label}>
+              <StepLabel>{label}</StepLabel>
+            </Step>
+          ))}
+        </Stepper>
+
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
             {error}
+          </Alert>
+        )}
+
+        {success && (
+          <Alert severity="success" sx={{ mb: 2 }}>
+            {success}
           </Alert>
         )}
 
@@ -209,6 +245,24 @@ const SiteForm: React.FC = () => {
               </FormControl>
             </Grid>
 
+            {isAdmin && (
+              <Grid item xs={12} md={6}>
+                <FormControl fullWidth>
+                  <InputLabel>Statut de Validation</InputLabel>
+                  <Select
+                    name="validationStatus"
+                    value={formData.validationStatus}
+                    onChange={handleChange}
+                    label="Statut de Validation"
+                  >
+                    <MenuItem value="pending">En Attente</MenuItem>
+                    <MenuItem value="approved">Approuvé</MenuItem>
+                    <MenuItem value="rejected">Rejeté</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+            )}
+
             <Grid item xs={12} md={6}>
               <FormControl fullWidth required>
                 <InputLabel>Statut</InputLabel>
@@ -217,6 +271,7 @@ const SiteForm: React.FC = () => {
                   value={formData.status}
                   onChange={handleChange}
                   label="Statut"
+                  disabled={!isAdmin && formData.validationStatus !== 'approved'}
                 >
                   <MenuItem value="active">Actif</MenuItem>
                   <MenuItem value="inactive">Inactif</MenuItem>
@@ -323,13 +378,16 @@ const SiteForm: React.FC = () => {
               <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
                 <Button
                   variant="outlined"
-                  color="primary"
                   onClick={() => navigate('/sites')}
                 >
                   Annuler
                 </Button>
-                <Button type="submit" variant="contained" color="primary">
-                  {id ? 'Modifier' : 'Enregistrer'}
+                <Button
+                  type="submit"
+                  variant="contained"
+                  color="primary"
+                >
+                  {id ? 'Mettre à jour' : isAdmin ? 'Créer le Site' : 'Proposer le Site'}
                 </Button>
               </Box>
             </Grid>

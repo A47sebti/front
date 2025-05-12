@@ -11,7 +11,7 @@ import {
 } from '@mui/material';
 import { AccountCircle as AccountIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 
 const Navbar: React.FC = () => {
   const navigate = useNavigate();

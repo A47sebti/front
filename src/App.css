@@ -40,3 +40,71 @@
 .read-the-docs {
   color: #888;
 }
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.container {
+  flex: 1;
+  padding: 20px;
+  background-color: #f5f5f5;
+}
+
+/* Styles pour le layout principal */
+main {
+  margin-top: 64px; /* Pour compenser la hauteur de la navbar */
+}
+
+/* Styles pour les formulaires */
+.form-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* Styles pour les tableaux responsifs */
+.table-container {
+  overflow-x: auto;
+  margin-top: 20px;
+}
+
+/* Styles pour les cartes du dashboard */
+.dashboard-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Styles pour les alertes */
+.alert-container {
+  margin-bottom: 20px;
+}
+
+/* Styles pour les filtres */
+.filters-container {
+  margin-bottom: 20px;
+  padding: 16px;
+  background-color: white;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+@media (max-width: 600px) {
+  .container {
+    margin-left: 0;
+    padding: 16px;
+  }
+}
+
+.layout {
+  display: flex;
+  min-height: 100vh;
+  padding-top: 64px; /* Hauteur de la navbar */
+}
+
+.layout .MuiDrawer-root {
+  position: fixed;
+}

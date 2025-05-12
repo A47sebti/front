@@ -1,231 +1,259 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Box,
-  Button,
-  Container,
   Paper,
+  Typography,
+  Button,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  Typography,
   IconButton,
-  TextField,
-  Grid,
-  MenuItem,
   Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Alert,
 } from '@mui/material';
 import {
   Edit as EditIcon,
   Delete as DeleteIcon,
+  CheckCircle as ApproveIcon,
+  Cancel as RejectIcon,
   Visibility as ViewIcon,
 } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
+import { siteService } from '../../services/siteService';
+import { useAuth } from '../../context/AuthContext';
 
 interface Site {
-  id: string;
+  _id: string;
   name: string;
+  location: {
+    city: string;
+    address: string;
+  };
   type: string;
-  category: string;
   status: string;
-  location: string;
-  lastMaintenance: string;
+  validationStatus: string;
+  siege: string;
+  createdBy: string;
 }
-
-const siteTypes = [
-  { value: 'macro', label: 'Macro' },
-  { value: 'micro', label: 'Micro' },
-  { value: 'pico', label: 'Pico' },
-];
-
-const siteCategories = [
-  { value: 'urban', label: 'Urbain' },
-  { value: 'rural', label: 'Rural' },
-  { value: 'suburban', label: 'Suburbain' },
-];
 
 const SiteList: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [sites, setSites] = useState<Site[]>([]);
-  const [filters, setFilters] = useState({
-    type: '',
-    category: '',
-    status: '',
-    search: '',
-  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [selectedSite, setSelectedSite] = useState<Site | null>(null);
+  const [openRejectDialog, setOpenRejectDialog] = useState(false);
 
-  useEffect(() => {
-    // TODO: Fetch sites from API
-    // fetchSites();
-  }, []);
+  const isAdmin = user?.role === 'ADMIN';
+  const isGestionnaire = user?.role === 'GESTIONNAIRE';
 
-  const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFilters({
-      ...filters,
-      [e.target.name]: e.target.value,
-    });
-  };
-
-  const handleDelete = async (siteId: string) => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce site ?')) {
-      try {
-        // TODO: Delete site
-        // await deleteSite(siteId);
-        // Refresh sites list
-        // fetchSites();
-      } catch (error) {
-        console.error('Error deleting site:', error);
+  const loadSites = async () => {
+    try {
+      let sitesList: Site[] = [];
+      if (isAdmin) {
+        sitesList = await siteService.getAllSites();
+      } else if (isGestionnaire && user?.siege) {
+        sitesList = await siteService.getSitesBySiege(user.siege);
       }
+      setSites(sitesList);
+    } catch (err) {
+      setError('Erreur lors du chargement des sites');
+      setSites([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
+  useEffect(() => {
+    loadSites();
+  }, [user]);
+
+  const handleApprove = async (siteId: string) => {
+    try {
+      await siteService.updateSiteValidation(siteId, {
+        validationStatus: 'approved',
+        status: 'active'
+      });
+      setSuccess('Site approuvé avec succès');
+      loadSites();
+    } catch (err) {
+      setError('Erreur lors de l\'approbation du site');
+    }
+  };
+
+  const handleReject = async () => {
+    if (!selectedSite) return;
+    try {
+      await siteService.updateSiteValidation(selectedSite._id, {
+        validationStatus: 'rejected',
+        rejectionReason
+      });
+      setSuccess('Site rejeté avec succès');
+      setOpenRejectDialog(false);
+      setRejectionReason('');
+      setSelectedSite(null);
+      loadSites();
+    } catch (err) {
+      setError('Erreur lors du rejet du site');
+    }
+  };
+
+  const openRejectDialogHandler = (site: Site) => {
+    setSelectedSite(site);
+    setOpenRejectDialog(true);
+  };
+
+  const getStatusChip = (status: string, validationStatus: string) => {
+    if (validationStatus === 'pending') {
+      return <Chip label="En attente" color="warning" />;
+    }
+    if (validationStatus === 'rejected') {
+      return <Chip label="Rejeté" color="error" />;
+    }
+    switch (status) {
       case 'active':
-        return 'success';
-      case 'maintenance':
-        return 'warning';
+        return <Chip label="Actif" color="success" />;
       case 'inactive':
-        return 'error';
+        return <Chip label="Inactif" color="error" />;
+      case 'maintenance':
+        return <Chip label="Maintenance" color="info" />;
       default:
-        return 'default';
+        return <Chip label={status} />;
     }
   };
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-        <Typography variant="h4" component="h1">
-          Sites Mobiles
-        </Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={() => navigate('/sites/new')}
-        >
-          Ajouter un site
-        </Button>
-      </Box>
+    <Box sx={{ p: 3 }}>
+      {loading ? (
+        <Typography>Chargement...</Typography>
+      ) : (
+        <>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+            <Typography variant="h4">
+              Sites Mobiles
+            </Typography>
+            {(isAdmin || isGestionnaire) && (
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={() => navigate('/sites/new')}
+              >
+                {isAdmin ? 'Ajouter un Site' : 'Proposer un Site'}
+              </Button>
+            )}
+          </Box>
 
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={6} md={3}>
-            <TextField
-              fullWidth
-              label="Rechercher"
-              name="search"
-              value={filters.search}
-              onChange={handleFilterChange}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <TextField
-              select
-              fullWidth
-              label="Type de site"
-              name="type"
-              value={filters.type}
-              onChange={handleFilterChange}
-            >
-              <MenuItem value="">Tous</MenuItem>
-              {siteTypes.map((type) => (
-                <MenuItem key={type.value} value={type.value}>
-                  {type.label}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <TextField
-              select
-              fullWidth
-              label="Catégorie"
-              name="category"
-              value={filters.category}
-              onChange={handleFilterChange}
-            >
-              <MenuItem value="">Toutes</MenuItem>
-              {siteCategories.map((category) => (
-                <MenuItem key={category.value} value={category.value}>
-                  {category.label}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <TextField
-              select
-              fullWidth
-              label="Statut"
-              name="status"
-              value={filters.status}
-              onChange={handleFilterChange}
-            >
-              <MenuItem value="">Tous</MenuItem>
-              <MenuItem value="active">Actif</MenuItem>
-              <MenuItem value="maintenance">En maintenance</MenuItem>
-              <MenuItem value="inactive">Inactif</MenuItem>
-            </TextField>
-          </Grid>
-        </Grid>
-      </Paper>
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+          )}
 
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Nom</TableCell>
-              <TableCell>Type</TableCell>
-              <TableCell>Catégorie</TableCell>
-              <TableCell>Statut</TableCell>
-              <TableCell>Localisation</TableCell>
-              <TableCell>Dernière maintenance</TableCell>
-              <TableCell>Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {sites.map((site) => (
-              <TableRow key={site.id}>
-                <TableCell>{site.name}</TableCell>
-                <TableCell>{site.type}</TableCell>
-                <TableCell>{site.category}</TableCell>
-                <TableCell>
-                  <Chip
-                    label={site.status}
-                    color={getStatusColor(site.status)}
-                    size="small"
-                  />
-                </TableCell>
-                <TableCell>{site.location}</TableCell>
-                <TableCell>{site.lastMaintenance}</TableCell>
-                <TableCell>
-                  <IconButton
-                    color="primary"
-                    onClick={() => navigate(`/sites/${site.id}`)}
-                  >
-                    <ViewIcon />
-                  </IconButton>
-                  <IconButton
-                    color="primary"
-                    onClick={() => navigate(`/sites/${site.id}/edit`)}
-                  >
-                    <EditIcon />
-                  </IconButton>
-                  <IconButton
-                    color="error"
-                    onClick={() => handleDelete(site.id)}
-                  >
-                    <DeleteIcon />
-                  </IconButton>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    </Container>
+          {success && (
+            <Alert severity="success" sx={{ mb: 2 }}>
+              {success}
+            </Alert>
+          )}
+
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Nom</TableCell>
+                  <TableCell>Ville</TableCell>
+                  <TableCell>Type</TableCell>
+                  <TableCell>Statut</TableCell>
+                  {isAdmin && <TableCell>Siège</TableCell>}
+                  <TableCell align="right">Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {sites.map((site) => (
+                  <TableRow key={site._id}>
+                    <TableCell>{site.name}</TableCell>
+                    <TableCell>{site.location.city}</TableCell>
+                    <TableCell>{site.type}</TableCell>
+                    <TableCell>
+                      {getStatusChip(site.status, site.validationStatus)}
+                    </TableCell>
+                    {isAdmin && <TableCell>{site.siege}</TableCell>}
+                    <TableCell align="right">
+                      <IconButton
+                        color="primary"
+                        onClick={() => navigate(`/sites/${site._id}`)}
+                      >
+                        <ViewIcon />
+                      </IconButton>
+                      
+                      {((isAdmin) || (isGestionnaire && site.createdBy === user?.id)) && (
+                        <IconButton
+                          color="primary"
+                          onClick={() => navigate(`/sites/${site._id}/edit`)}
+                        >
+                          <EditIcon />
+                        </IconButton>
+                      )}
+
+                      {isAdmin && site.validationStatus === 'pending' && (
+                        <>
+                          <IconButton
+                            color="success"
+                            onClick={() => handleApprove(site._id)}
+                          >
+                            <ApproveIcon />
+                          </IconButton>
+                          <IconButton
+                            color="error"
+                            onClick={() => openRejectDialogHandler(site)}
+                          >
+                            <RejectIcon />
+                          </IconButton>
+                        </>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          {/* Dialog de rejet */}
+          <Dialog open={openRejectDialog} onClose={() => setOpenRejectDialog(false)}>
+            <DialogTitle>Motif du rejet</DialogTitle>
+            <DialogContent>
+              <TextField
+                autoFocus
+                margin="dense"
+                label="Raison du rejet"
+                type="text"
+                fullWidth
+                multiline
+                rows={4}
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+              />
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setOpenRejectDialog(false)}>Annuler</Button>
+              <Button onClick={handleReject} color="error">
+                Rejeter
+              </Button>
+            </DialogActions>
+          </Dialog>
+        </>
+      )}
+    </Box>
   );
 };
 

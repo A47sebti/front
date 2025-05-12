@@ -1,88 +1,72 @@
+import { Intervention, InterventionNote, Attachment } from '../types/intervention';
 import api from './api';
 
-export interface Intervention {
-  _id: string;
-  siteId: string;
-  type: 'maintenance' | 'repair' | 'installation' | 'inspection';
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-  priority: 'low' | 'medium' | 'high' | 'critical';
-  description: string;
-  assignedTo: string;
-  startDate: string;
-  endDate: string | null;
-  equipment: {
-    id: string;
-    name: string;
-    type: string;
-  }[];
-  notes: string[];
-  createdAt: string;
-  updatedAt: string;
-}
-
 export const interventionService = {
-  // Obtenir la liste des interventions
-  getInterventions: async (filters?: {
-    status?: Intervention['status'];
-    type?: Intervention['type'];
-    priority?: Intervention['priority'];
-    startDate?: string;
-    endDate?: string;
-  }) => {
-    const response = await api.get<Intervention[]>('/interventions', { params: filters });
+  getInterventions: async () => {
+    const response = await api.get<Intervention[]>('/interventions');
     return response.data;
   },
 
-  // Obtenir une intervention par son ID
+  getInterventionsBySite: async (siteId: string) => {
+    const response = await api.get<Intervention[]>(`/interventions/site/${siteId}`);
+    return response.data;
+  },
+
+  getInterventionsByTechnician: async (technicianId: string) => {
+    const response = await api.get<Intervention[]>(`/interventions/technician/${technicianId}`);
+    return response.data;
+  },
+
   getInterventionById: async (id: string) => {
     const response = await api.get<Intervention>(`/interventions/${id}`);
     return response.data;
   },
-
-  // Créer une nouvelle intervention
-  createIntervention: async (interventionData: Omit<Intervention, '_id' | 'createdAt' | 'updatedAt'>) => {
-    const response = await api.post<Intervention>('/interventions', interventionData);
+  
+  createIntervention: async (data: Omit<Intervention, '_id' | 'createdAt' | 'updatedAt'>) => {
+    const response = await api.post<Intervention>('/interventions', data);
     return response.data;
   },
-
-  // Mettre à jour une intervention
-  updateIntervention: async (id: string, interventionData: Partial<Intervention>) => {
-    const response = await api.put<Intervention>(`/interventions/${id}`, interventionData);
+  
+  updateIntervention: async (id: string, data: Partial<Intervention>) => {
+    const response = await api.put<Intervention>(`/interventions/${id}`, data);
     return response.data;
   },
-
-  // Supprimer une intervention
-  deleteIntervention: async (id: string) => {
-    await api.delete(`/interventions/${id}`);
-  },
-
-  // Ajouter une note à une intervention
-  addNote: async (id: string, note: string) => {
-    const response = await api.post<Intervention>(`/interventions/${id}/notes`, { note });
+  
+  deleteIntervention: (id: string) => 
+    api.delete(`/interventions/${id}`),
+  
+  // Gestion des notes
+  addNote: async (interventionId: string, content: string) => {
+    const response = await api.post<InterventionNote>(
+      `/interventions/${interventionId}/notes`,
+      { content }
+    );
     return response.data;
   },
-
-  // Mettre à jour le statut d'une intervention
-  updateStatus: async (id: string, status: Intervention['status']) => {
-    const response = await api.put<Intervention>(`/interventions/${id}/status`, { status });
+  
+  deleteNote: (interventionId: string, noteId: string) => 
+    api.delete(`/interventions/${interventionId}/notes/${noteId}`),
+  
+  // Gestion des pièces jointes
+  uploadAttachment: async (interventionId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<Attachment>(
+      `/interventions/${interventionId}/attachments`,
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      }
+    );
     return response.data;
   },
-
-  // Assigner une intervention à un technicien
-  assignTechnician: async (id: string, technicianId: string) => {
-    const response = await api.put<Intervention>(`/interventions/${id}/assign`, { technicianId });
-    return response.data;
-  },
-
-  // Obtenir les statistiques des interventions
+  
+  deleteAttachment: (interventionId: string, attachmentId: string) => 
+    api.delete(`/interventions/${interventionId}/attachments/${attachmentId}`),
+  
+  // Statistiques
   getInterventionStats: async () => {
-    const response = await api.get<{
-      total: number;
-      byStatus: Record<Intervention['status'], number>;
-      byType: Record<Intervention['type'], number>;
-      byPriority: Record<Intervention['priority'], number>;
-      averageCompletionTime: number;
-    }>('/interventions/stats');
+    const response = await api.get('/interventions/stats');
     return response.data;
-  },
+  }
 }; 
